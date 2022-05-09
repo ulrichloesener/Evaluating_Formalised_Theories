@@ -1,0 +1,765 @@
+---
+title: "Figures"
+author: "Ulrich Lösener"
+date: "8 5 2022"
+output: html_document
+---
+
+This file contains all the code necessary to produce the figures in the paper. 
+Note that first, the models need to be run in the markdown file "Formal_models1&2".
+
+### Beta distribution 
+The distribution from with health parameters are drawn for each individual can be
+visualised with the following code.
+
+```{r Beta Distribution}
+# define range (from 0 to 1)
+range <- seq(0, 1, length=100)
+
+# create plot of Beta distribution with shape parameters 1.3 and 6
+plot(range, dbeta(range, 1.3, 6), type='l', lwd=2, bty="n", xlab="x", ylab="Density", main="Beta Distribution (Shape = 1.3, 6)")
+```
+
+
+### Data generation model 1
+Without intervention - 15 days
+```{r}
+par(mfrow=c(2,3))
+plot(ppl.long[511:526, 2], type="b", ylab="Trigger", xlab="Days", main="Trigger", bty="n")
+plot(ppl.long[511:526, 3], type="b", ylab="Anxiety", main="Anxiety", xlab="Days", bty="n")
+plot(ppl.long[511:526, 4], type="b", ylab="RSB", main="Restorative SB", xlab="Days", bty="n")
+plot(ppl.long[511:526, 5], type="b", ylab="Belief", main="Negative Belief", xlab="Days", bty="n")
+plot(ppl.long[511:526, 6], type="b", ylab="PSB", main="Preventive SB", xlab="Days", bty="n")
+```
+
+With intervention on day 15 - 30 days
+```{r}
+par(mfrow=c(2,3))
+plot(ppl.long[511:541, 2], type="b", ylab="Trigger", xlab="Days", main="Trigger", bty="n")
+plot(ppl.long[511:541, 3], type="b", ylab="Anxiety", main="Anxiety", xlab="Days", bty="n")
+plot(ppl.long[511:541, 4], type="b", ylab="RSB", main="Restorative SB", xlab="Days", bty="n")
+abline(v=15, col="blue")
+plot(ppl.long[511:541, 5], type="b", ylab="Belief", main="Negative Belief", xlab="Days", bty="n")
+plot(ppl.long[511:541, 6], type="b", ylab="PSB", main="Preventive SB", xlab="Days", bty="n")
+abline(v=15, col="blue")
+```
+
+### Establish diagnostic criteria
+If prevalences over time are to be plotted, comment in lines 50 - 52, 54, 94-98, and comment out line 55.
+Otherwise, a single point prevalence is computed
+```{r Criteria Model 1}
+#sequt <- rev(seq(from=1, to=tpoints, by=30))
+#prev <- rep(NA, length(sequt))
+#for (i in sequt){
+# time frame in which symptoms are measured for diagnosis: 1 if all the time
+#t <- i 
+t <- 1
+# unreasonable, excessive fear 
+fearsum <- rep(NA, N)
+for(p in 1:N){
+  fearsum[p] <- sum(ppl.long[(sequ[p]):(sequ[p]+(tpoints-t)),3])
+}
+
+anx2.crit <- rep(NA, N)
+for(p in 1:N){
+  anx2.crit[p] <- length(which(ppl.long[(sequ[p]):(sequ[p]+(tpoints-t)),3]>=2))
+}
+
+peakanx <- rep(NA, N)
+for(p in 1:N){
+  peakanx[p] <- length(which(ppl.long[(sequ[p]):(sequ[p]+(tpoints-t)),3]==3))
+}
+
+# Frequency of triggers
+trigsum <- rep(NA, N)
+for(p in 1:N){
+  trigsum[p] <- sum(ppl.long[(sequ[p]):(sequ[p]+(tpoints-t)),2])
+}
+
+# avoidance or extreme distress
+rsbsum <- rep(NA, N)
+for(p in 1:N){
+  rsbsum[p] <- sum(ppl.long[(sequ[p]):(sequ[p]+(tpoints-t)),4])
+}
+
+psbsum <- rep(NA, N)
+for(p in 1:N){
+  psbsum[p] <- sum(ppl.long[(sequ[p]):(sequ[p]+(tpoints-t)),6])
+}
+
+# high negative belief towards stimulus
+belsum <- rep(NA, N)
+for(p in 1:N){
+  belsum[p] <- sum(ppl.long[(sequ[p]):(sequ[p]+(tpoints-t)),5])
+}
+#ppl.wide.prelim <- as.data.frame(cbind(trigsum, fearsum, peakanx, rsbsum, psbsum, belsum))
+#ppl.wide.prelim$health <- ifelse(((ppl.wide.prelim$peakanx >= (tpoints-i)/6 & #ppl.wide.prelim$rsbsum >= (tpoints-i)/10) | (ppl.wide.prelim$peakanx >= (tpoints-i)/6 & #ppl.wide.prelim$psbsum >= (tpoints-i)/3)) & ppl.wide.prelim$belsum >= (tpoints-i), 0, 1)
+#prev[match(i, sequt)] <- length(which(ppl.wide.prelim$health==0))/N
+#}
+
+# which ppl have "healthy" parameter?
+par.health <- rep(NA, N)
+for(p in 1:N){
+par.health[p] <- length(which(ppl.long[(sequ[p]):(sequ[p]+(tpoints-1)),7]==.1))
+}
+par.health[par.health==tpoints] <- 1
+
+# add diagnostic info in "ppl" matrix
+ppl.wide <- as.data.frame(cbind(trigsum, fearsum, anx2.crit, peakanx, rsbsum, psbsum,                                       belsum, par.health))
+
+# assign 1 to healthy ppl and 0 to unhealthy according to the 3 criteria
+tpoints.diag <- 360 # time frame for the diagnosis
+ppl.wide$health <- ifelse(((ppl.wide$anx2.crit >= tpoints.diag/6 
+                            & ppl.wide$rsbsum >= tpoints.diag/10) 
+                            | (ppl.wide$anx2.crit >= tpoints.diag/6 
+                            & ppl.wide$psbsum >= tpoints.diag/3)) 
+                            & ppl.wide$belsum >= tpoints.diag, 0, 1)
+
+# how many meet all criteria?
+length(which(ppl.wide$health==0))/N
+
+# combinations of health parameter & actual health
+tab <- table(ppl.wide$par.health, ppl.wide$health)
+colnames(tab) <- c("unhealthy", "healthy")
+rownames(tab) <- c("par unhealthy", "par healthy")
+tab
+```
+
+Again, if prevalences over time are to be plotted, comment in lines 131 - 133, 135, 176-179, and comment out line 137
+Otherwise, a single point prevalence is computed
+```{r Criteria Model 2}
+#sequt2 <- rev(seq(from=1, to=tpoints2, by=30))
+#prev2 <- rep(NA, length(sequt2))
+#for (i in sequt2){
+# time frame in which symptoms are measured for diagnosis: 1 if all the time
+#t <- i
+
+t <- 1
+
+trigsum2 <- rep(NA, N2)
+for(p in 1:N2){
+ trigsum2[p] <- sum(ppl.long2[(sequ2[p]):(sequ2[p]+(tpoints2-t)),2])
+}
+
+# unreasonable, excessive fear 
+fearsum2 <- rep(NA, N2)
+for(p in 1:N2){
+  fearsum2[p] <- sum(ppl.long2[(sequ2[p]):(sequ2[p]+(tpoints2-t)),3])
+}
+
+anx2.crit2 <- rep(NA, N2)
+for(p in 1:N2){
+anx2.crit2[p] <- length(which(ppl.long2[(sequ2[p]):(sequ2[p]+(tpoints2-t)),3]>=2))
+}
+
+peakanx2 <- rep(NA, N2)
+for(p in 1:N2){
+peakanx2[p] <- length(which(ppl.long2[(sequ2[p]):(sequ2[p]+(tpoints2-t)),3]==3))
+}
+
+# avoidance or extreme distress 
+rsbsum2 <- rep(NA, N2)
+for(p in 1:N2){
+  rsbsum2[p] <- sum(ppl.long2[(sequ2[p]):(sequ2[p]+(tpoints2-t)),4])
+}
+
+psbsum2 <- rep(NA, N2)
+for(p in 1:N2){
+  psbsum2[p] <- sum(ppl.long2[(sequ2[p]):(sequ2[p]+(tpoints2-t)),6])
+}
+
+# high negative belief towards stimulus
+belsum2 <- rep(NA, N2)
+for(p in 1:N2){
+  belsum2[p] <- sum(ppl.long2[(sequ2[p]):(sequ2[p]+(tpoints2-t)),5])
+}
+#ppl.wide.prelim2 <- as.data.frame(cbind(trigsum2, fearsum2, peakanx2, rsbsum2, psbsum2, belsum2))
+#ppl.wide.prelim2$health <- ifelse(((ppl.wide.prelim2$peakanx >= (tpoints2-i)/6 & ppl.wide.prelim2$rsbsum >= (tpoints2-i)/10) | (ppl.wide.prelim2$peakanx >= (tpoints2-i)/6 & ppl.wide.prelim2$psbsum >= (tpoints2-i)/3)) & ppl.wide.prelim2$belsum >= (tpoints2-i), 0, 1)
+#prev2[match(i, sequt2)] <- length(which(ppl.wide.prelim2$health==0))/N2
+#}
+
+# add diagnostic info in "ppl" matrix
+ppl.wide2 <- as.data.frame(cbind(trigsum2, fearsum2, anx2.crit2, peakanx2, rsbsum2, psbsum2, belsum2))
+
+# extract lat parameter for every person
+lats2 <- rep(NA, N2)
+for (p in 1:N2){
+  lats2[p] <- ppl.long2[sequ2[p],7]
+}
+ppl.wide2$lat2 <- lats2
+
+# add health status for every person according to criteria
+tpoints.diag2 <- 360 # set time frame for diagnosis
+ppl.wide2$health <- ifelse(((ppl.wide2$anx2.crit2 >= tpoints.diag2/6 & ppl.wide2$rsbsum2 >=        tpoints.diag2/10) | (ppl.wide2$anx2.crit2 >= tpoints.diag2/6 & ppl.wide2$psbsum2 >= tpoints.diag2/3)) & ppl.wide2$belsum2 >= tpoints.diag2, 0, 1)
+
+# how many meet all criteria?
+length(which(ppl.wide2$health==0))/N2
+
+# combinations of health parameter & actual health
+tab2 <- table((ppl.wide2$lat2<.5), (ppl.wide2$health))
+colnames(tab2) <- c("unhealthy", "healthy")
+rownames(tab2) <- c("lat2 unhealthy", "lat2 healthy")
+tab2
+```
+
+### Plot longitudinal data of anxiety and beilef for both models
+
+```{r Time Series Anxiety & Belief Both Models}
+
+# add health info to every person 
+health.long <- rep(ppl.wide$health, each=tpoints)
+ppl.long <- cbind(ppl.long, health.long)
+health.long2 <- rep(ppl.wide2$health, each=tpoints2)
+ppl.long2 <- cbind(ppl.long2, health.long2)
+
+# split long data frame of model 1 into healthy and unhealthy
+ppl.long.h <- ppl.long[which(ppl.long[,"health.long"]==1),]
+ppl.long.p <- ppl.long[which(ppl.long[,"health.long"]==0),]
+# same for model 2
+ppl.long.h2 <- ppl.long2[which(ppl.long2[,"health.long2"]==1),]
+ppl.long.p2 <- ppl.long2[which(ppl.long2[,"health.long2"]==0),]
+
+
+# placeholders for mean anxiety and belief values model 1
+mean.anx <- rep(NA, tpoints)
+mean.anx.h <- rep(NA, tpoints)
+mean.anx.p <- rep(NA, tpoints)
+mean.bel <- rep(NA, tpoints)
+mean.bel.h <- rep(NA, tpoints)
+mean.bel.p <- rep(NA, tpoints)
+# same for model 2
+mean.anx2 <- rep(NA, tpoints2)
+mean.anx.h2 <- rep(NA, tpoints2)
+mean.anx.p2 <- rep(NA, tpoints2)
+mean.bel2 <- rep(NA, tpoints2)
+mean.bel.h2 <- rep(NA, tpoints2)
+mean.bel.p2 <- rep(NA, tpoints2)
+
+# sequences for for loop 
+sequ.h2 <- seq(from=1, to=(length(unique(ppl.long.h2[,"ID"]))*tpoints2), by=tpoints2)
+sequ.p2 <- seq(from=1, to=(length(unique(ppl.long.p2[,"ID"]))*tpoints2), by=tpoints2)
+sequ.h <- seq(from=1, to=(length(unique(ppl.long.h[,"ID"]))*tpoints), by=tpoints)
+sequ.p <- seq(from=1, to=(length(unique(ppl.long.p[,"ID"]))*tpoints), by=tpoints)
+
+# store mean anxiety and belief values for healthy and phobics separately - model 1
+for (j in 1:tpoints){
+  mean.anx[j] <- mean(ppl.long[(sequ-1+j),"anx"])
+  mean.anx.h[j] <- mean(ppl.long.h[(sequ.h-1+j),"anx"])
+  mean.anx.p[j] <- mean(ppl.long.p[(sequ.p-1+j),"anx"])
+  
+  mean.bel[j] <- mean(ppl.long[(sequ-1+j),"bel"])
+  mean.bel.h[j] <- mean(ppl.long.h[(sequ.h-1+j),"bel"])
+  mean.bel.p[j] <- mean(ppl.long.p[(sequ.p-1+j),"bel"])
+}
+# store mean anxiety and belief values for healthy and phobics separately - model 2
+for (j in 1:tpoints2){
+  mean.anx2[j] <- mean(ppl.long2[(sequ2-1+j),"anx2"])
+  mean.anx.h2[j] <- mean(ppl.long.h2[(sequ.h2-1+j),"anx2"])
+  mean.anx.p2[j] <- mean(ppl.long.p2[(sequ.p2-1+j),"anx2"])
+  
+  mean.bel2[j] <- mean(ppl.long2[(sequ2-1+j),"bel2"])
+  mean.bel.h2[j] <- mean(ppl.long.h2[(sequ.h2-1+j),"bel2"])
+  mean.bel.p2[j] <- mean(ppl.long.p2[(sequ.p2-1+j),"bel2"])
+}
+
+# bind them together - model 2
+mean.anx.all <- cbind(mean.anx, mean.anx.h, mean.anx.p)
+mean.bel.all <- cbind(mean.bel, mean.bel.h, mean.bel.p)
+# and model 2
+mean.anx.all2 <- cbind(mean.anx2, mean.anx.h2, mean.anx.p2)
+mean.bel.all2 <- cbind(mean.bel2, mean.bel.h2, mean.bel.p2)
+
+# plot everything
+matplot(mean.anx.all2, type="l", ylab="mean anxiety", xlab="days", main="Model 1", col=c("black", "blue", "red"))
+legend("bottom", legend = c("total", "healthy", "phobic"), col=c("black", "blue", "red"), pch=16, horiz=T)
+
+matplot(mean.bel.all, type="l", ylab="mean belief", xlab="days", main="Model 1", col=c("black", "blue", "red"))
+legend("bottom", legend = c("total", "healthy", "phobic"),  col=c("black", "blue", "red"), pch=16, horiz=T)
+
+matplot(mean.anx.all2, type="l", ylab="mean anxiety", xlab="days", main="Model 2", col=c("black", "blue", "red"))
+legend("bottom", legend = c("total", "healthy", "phobic"), col=c("black", "blue", "red"), pch=16, horiz=T)
+
+matplot(mean.bel.all2, type="l", ylab="mean belief", xlab="days", main="Model 2", col=c("black", "blue", "red"))
+legend("bottom", legend = c("total", "healthy", "phobic"),  col=c("black", "blue", "red"), pch=16, horiz=T)
+
+```
+
+### Plot VAR model
+
+```{r}
+
+library(vars)
+library(qgraph)
+
+# create sequences for both models
+sequ.p1 <- seq(from=1, to=nrow(ppl.long.p), by=tpoints)
+sequ.h1 <- seq(from=1, to=nrow(ppl.long.h), by=tpoints)
+sequ.p2 <- seq(from=1, to=nrow(ppl.long.p2), by=tpoints2)
+sequ.h2 <- seq(from=1, to=nrow(ppl.long.h2), by=tpoints2)
+
+# create placeholders 
+anx.person.m1 <- matrix(NA, nrow=tpoints, ncol=6)
+bel.person.m1 <- matrix(NA, nrow=tpoints, ncol=6)
+anx.person.m2 <- matrix(NA, nrow=tpoints2, ncol=6)
+bel.person.m2 <- matrix(NA, nrow=tpoints2, ncol=6)
+
+# select 1 healthy vs 1 phobic person
+# model 1
+vars.p.m1 <- ppl.long[ppl.long[,"ID"]==163,c("anx", "bel")]
+v.p.m1 <- VARselect(vars.p.m1, lag.max = 9, type = "const")
+vars.h.m1 <- ppl.long[ppl.long[,"ID"]==115,c("anx", "bel")]
+v.h.m1 <- VARselect(vars.h.m1, lag.max = 9, type = "const")
+# model 2
+vars.p.m2 <- ppl.long2[ppl.long[,"ID"]==419,c("anx2", "bel2")]
+v.p.m2 <- VARselect(vars.p.m2, lag.max = 9, type = "const")
+vars.h.m2 <- ppl.long2[ppl.long[,"ID"]==508,c("anx2", "bel2")]
+v.h.m2 <- VARselect(vars.h.m2, lag.max = 9, type = "const")
+
+# lag selection
+# model 1
+plot(v.p.m1$criteria[1,], type="l", xlab="number of lags", ylab="AIC", main="phobic person model 1")
+plot(v.h.m1$criteria[1,], type="l", xlab="number of lags", ylab="AIC", main="healthy person model 1")
+# model 2
+plot(v.p.m2$criteria[1,], type="l", xlab="number of lags", ylab="AIC", main="phobic person model 2")
+plot(v.h.m2$criteria[1,], type="l", xlab="number of lags", ylab="AIC", main="healthy person model 2")
+
+# fit VAR model
+# model 1
+m.var.p.m1 <- VAR(vars.p.m1, p=1, type = "const")
+m.var.h.m1 <- VAR(vars.h.m1, p=1, type = "const")
+# model 2
+m.var.p.m2 <- VAR(vars.p.m2, p=1, type = "const")
+m.var.h.m2 <- VAR(vars.h.m2, p=1, type = "const")
+
+# extract parameters of the VAR model
+# model 1
+phi.p.m1 <- rbind(coef(m.var.p.m1)$anx[1:2,1], coef(m.var.p.m1)$bel[1:2,1])
+phi.h.m1 <- rbind(coef(m.var.h.m1)$anx[1:2,1], coef(m.var.h.m1)$bel[1:2,1])
+# model 2
+phi.p.m2 <- rbind(coef(m.var.p.m2)$anx[1:2,1], coef(m.var.p.m2)$bel[1:2,1])
+phi.h.m2 <- rbind(coef(m.var.h.m2)$anx[1:2,1], coef(m.var.h.m2)$bel[1:2,1])
+
+# make network plots
+par(mfrow=c(2,2))
+qgraph(t(phi.p.m1), edge.labels = T, layout ="circle", fade = FALSE, labels=c("anxiety", "belief"), negDashed=T, edge.label.cex=1.5)
+legend("top", legend = c("Phobic Person Model 1"), horiz=T, bty="n")
+qgraph(t(phi.h.m1), edge.labels = T, layout ="circle", fade = FALSE, labels=c("anxiety", "belief"), negDashed=T, edge.label.cex=1.5)
+legend("top", legend = c("Healthy Person Model 1"), horiz=T, bty="n")
+qgraph(t(phi.p.m2), edge.labels = T, layout ="circle", fade = FALSE, labels=c("anxiety", "belief"), negDashed=T, edge.label.cex=1.5)
+legend("top", legend = c("Phobic Person Model 2"), horiz=T, bty="n")
+qgraph(t(phi.h.m2), edge.labels = T, layout ="circle", fade = FALSE, labels=c("anxiety", "belief"), negDashed=T, edge.label.cex=1.5)
+legend("top", legend = c("Healthy Person Model 2"), horiz=T, bty="n")
+```
+
+### Emulate SMSP-A questionnaire
+
+This chunk is for emulating the SMSP-A with model 1 - necessary for later plots
+```{r SMSP-A Model 1}
+
+# placeholders
+occurrences <- matrix(NA, nrow = nrow(ppl.long), ncol = 11)
+colnames(occurrences) <- c("ID", "occ anx 1", "occ anx 2", "occ anx 3", "occ bel 1", "occ bel 2", "occ bel 3", "occ rsb", "occ psb", "occ anxbel", "occ anxrsb")
+anx1.occ <- rep(NA, tpoints)
+anx2.occ <- rep(NA, tpoints)
+anx3.occ <- rep(NA, tpoints)
+bel1.occ <- rep(NA, tpoints)
+bel2.occ <- rep(NA, tpoints)
+bel3.occ <- rep(NA, tpoints)
+rsb.occ <- rep(NA, tpoints)
+psb.occ <- rep(NA, tpoints)
+anxbel.occ <- rep(NA, tpoints)
+anxrsb.occ <- rep(NA, tpoints)
+
+# make data for occurrences of symptoms in trigger situations
+for(j in sequ){
+  for (i in j:(j+tpoints-1)){
+    anx1.occ[i] <- length(which(ppl.long[i,2]==1 && ppl.long[i,3]>=1))
+    anx2.occ[i] <- length(which(ppl.long[i,2]==1 && ppl.long[i,3]>=2))
+    anx3.occ[i] <- length(which(ppl.long[i,2]==1 && ppl.long[i,3]==3))
+    bel1.occ[i] <- length(which(ppl.long[i,2]==1 && ppl.long[i,5]>=1))
+    bel2.occ[i] <- length(which(ppl.long[i,2]==1 && ppl.long[i,5]>=2))
+    bel3.occ[i] <- length(which(ppl.long[i,2]==1 && ppl.long[i,5]==3))
+    rsb.occ[i] <- length(which(ppl.long[i,2]==1 && ppl.long[i,4]==1))
+    psb.occ[i] <- length(which(ppl.long[i,2]==1 && ppl.long[i,6]==1))
+    anxbel.occ[i] <- length(which( (ppl.long[i,2]==1 && ppl.long[i,3]>=1) ||                                                    (ppl.long[i,2]==1 && ppl.long[i,5]>=1)))
+    anxrsb.occ[i] <- length(which( (ppl.long[i,2]==1 && ppl.long[i,3]>=2) ||                                                    (ppl.long[i,2]==1 && ppl.long[i,4]>=1)))
+  }
+  occurrences[j:(j+tpoints-1), 1] <- which(sequ==j)
+  occurrences[j:(j+tpoints-1), 2] <- anx1.occ[j:(j+tpoints-1)]
+  occurrences[j:(j+tpoints-1), 3] <- anx2.occ[j:(j+tpoints-1)]
+  occurrences[j:(j+tpoints-1), 4] <- anx3.occ[j:(j+tpoints-1)]
+  occurrences[j:(j+tpoints-1), 5] <- bel1.occ[j:(j+tpoints-1)]
+  occurrences[j:(j+tpoints-1), 6] <- bel2.occ[j:(j+tpoints-1)]
+  occurrences[j:(j+tpoints-1), 7] <- bel3.occ[j:(j+tpoints-1)]
+  occurrences[j:(j+tpoints-1), 8] <- rsb.occ[j:(j+tpoints-1)]
+  occurrences[j:(j+tpoints-1), 9] <- psb.occ[j:(j+tpoints-1)]
+  occurrences[j:(j+tpoints-1), 10] <- anxbel.occ[j:(j+tpoints-1)]
+  occurrences[j:(j+tpoints-1), 11] <- anxrsb.occ[j:(j+tpoints-1)]
+}
+
+# create sequence for for loop
+sequj <- seq(from=30, to=tpoints, by=30)
+
+# placeholders
+total <- rep(NA, length(sequj))
+healthy <- rep(NA, length(sequj))
+phobic <- rep(NA, length(sequj))
+
+# until what time point should be measured:
+tpoints.smsp <- 360
+
+# only take the last seven days 
+for(i in 1:nrow(ppl.wide)){
+  anx1.occ <- occurrences[occurrences[,1]==i,2]
+  ppl.wide$anx1.occ7[i] <- sum(anx1.occ[(tpoints.smsp-6):tpoints.smsp])
+  anx2.occ <- occurrences[occurrences[,1]==i,3]
+  ppl.wide$anx2.occ7[i] <- sum(anx2.occ[(tpoints.smsp-6):tpoints.smsp])
+  anx3.occ <- occurrences[occurrences[,1]==i,4]
+  ppl.wide$anx3.occ7[i] <- sum(anx3.occ[(tpoints.smsp-6):tpoints.smsp])
+  bel1.occ <- occurrences[occurrences[,1]==i,5]
+  ppl.wide$bel1.occ7[i] <- sum(bel1.occ[(tpoints.smsp-6):tpoints.smsp])
+  bel2.occ <- occurrences[occurrences[,1]==i,6]
+  ppl.wide$bel2.occ7[i] <- sum(bel2.occ[(tpoints.smsp-6):tpoints.smsp])
+  bel3.occ <- occurrences[occurrences[,1]==i,7]
+  ppl.wide$bel3.occ7[i] <- sum(bel3.occ[(tpoints.smsp-6):tpoints.smsp])
+  rsb.occ <- occurrences[occurrences[,1]==i,8]
+  ppl.wide$rsb.occ7[i] <- sum(rsb.occ[(tpoints.smsp-6):tpoints.smsp])
+  psb.occ <- occurrences[occurrences[,1]==i,9]
+  ppl.wide$psb.occ7[i] <- sum(psb.occ[(tpoints.smsp-6):tpoints.smsp])
+  anxbel.occ <- occurrences[occurrences[,1]==i,10]
+  ppl.wide$anxbel.occ7[i] <- sum(anxbel.occ[(tpoints.smsp-6):tpoints.smsp])
+  anxrsb.occ <- occurrences[occurrences[,1]==i,11]
+  ppl.wide$anxrsb.occ7[i] <- sum(anxrsb.occ[(tpoints.smsp-6):tpoints.smsp])
+}
+
+# placeholders
+smsp <- matrix(NA, nrow=nrow(ppl.wide), ncol=7)
+colnames(smsp) <- c("i1", "i2", "i3", "i4", "i6", "i7", "i10")
+
+for (i in 1:nrow(ppl.wide)) {
+  # item 1
+  smsp[i,1] <- if (ppl.wide$anx1.occ7[i] == 0) {0}
+               else if (ppl.wide$anx1.occ7[i] <= 2) {1}
+               else if (ppl.wide$anx1.occ7[i] <= 4) {2}
+               else if (ppl.wide$anx1.occ7[i] <= 6) {3}
+               else {4}
+  # item 2
+  smsp[i,2] <- if (ppl.wide$anxbel.occ7[i] == 0) {0}
+               else if (ppl.wide$anxbel.occ7[i] <= 2) {1}
+               else if (ppl.wide$anxbel.occ7[i] <= 4) {2}
+               else if (ppl.wide$anxbel.occ7[i] <= 6) {3}
+               else {4}
+  # item 3
+  smsp[i,3] <- if (ppl.wide$bel1.occ7[i] == 0) {0}
+               else if (ppl.wide$bel1.occ7[i] <= 2) {1}
+               else if (ppl.wide$bel1.occ7[i] <= 4) {2}
+               else if (ppl.wide$bel1.occ7[i] <= 6) {3}
+               else {4}
+  # item 4
+  smsp[i,4] <- if (ppl.wide$anx2.occ7[i] == 0) {0}
+               else if (ppl.wide$anx2.occ7[i] <= 2) {1}
+               else if (ppl.wide$anx2.occ7[i] <= 4) {2}
+               else if (ppl.wide$anx2.occ7[i] <= 6) {3}
+               else {4}
+  # item 6
+  smsp[i,5] <- if (ppl.wide$psb.occ7[i] == 0) {0}
+               else if (ppl.wide$psb.occ7[i] <= 2) {1}
+               else if (ppl.wide$psb.occ7[i] <= 4) {2}
+               else if (ppl.wide$psb.occ7[i] <= 6) {3}
+               else {4}
+  # item 7
+  smsp[i,6] <- if (ppl.wide$rsb.occ7[i] == 0) {0}
+               else if (ppl.wide$rsb.occ7[i] <= 2) {1}
+               else if (ppl.wide$rsb.occ7[i] <= 4) {2}
+               else if (ppl.wide$rsb.occ7[i] <= 6) {3}
+               else {4}
+  # item 10
+  smsp[i,7] <- if (ppl.wide$anxrsb.occ7[i] == 0) {0}
+               else if (ppl.wide$anxrsb.occ7[i] <= 2) {1}
+               else if (ppl.wide$anxrsb.occ7[i] <= 4) {2}
+               else if (ppl.wide$anxrsb.occ7[i] <= 6) {3}
+               else {4}
+  ppl.wide$total[i] <- rowSums(smsp)[i] 
+}
+```
+
+This chunk is for emulating the SMSP-A with model 2 - necessary for later plots
+
+```{r SMSP-A Model 2}
+# placeholders
+occurrences2 <- matrix(NA, nrow = nrow(ppl.long2), ncol = 11)
+colnames(occurrences2) <- c("ID", "occ anx 1", "occ anx 2", "occ anx 3", "occ bel 1", "occ bel 2", "occ bel 3", "occ rsb", "occ psb", "occ anxbel", "occ anxrsb")
+anx1.occ2 <- rep(NA, tpoints2)
+anx2.occ2 <- rep(NA, tpoints2)
+anx3.occ2 <- rep(NA, tpoints2)
+bel1.occ2 <- rep(NA, tpoints2)
+bel2.occ2 <- rep(NA, tpoints2)
+bel3.occ2 <- rep(NA, tpoints2)
+rsb.occ2 <- rep(NA, tpoints2)
+psb.occ2 <- rep(NA, tpoints2)
+anxbel.occ2 <- rep(NA, tpoints2)
+anxrsb.occ2 <- rep(NA, tpoints2)
+
+# make data for occurrences of symptoms in trigger situations
+for(j in sequ2){
+  for (i in j:(j+tpoints2-1)){
+    anx1.occ2[i] <- length(which(ppl.long2[i,2]==1 && ppl.long2[i,3]>=1))
+    anx2.occ2[i] <- length(which(ppl.long2[i,2]==1 && ppl.long2[i,3]>=2))
+    anx3.occ2[i] <- length(which(ppl.long2[i,2]==1 && ppl.long2[i,3]==3))
+    bel1.occ2[i] <- length(which(ppl.long2[i,2]==1 && ppl.long2[i,5]>=1))
+    bel2.occ2[i] <- length(which(ppl.long2[i,2]==1 && ppl.long2[i,5]>=2))
+    bel3.occ2[i] <- length(which(ppl.long2[i,2]==1 && ppl.long2[i,5]==3))
+    rsb.occ2[i] <- length(which(ppl.long2[i,2]==1 && ppl.long2[i,4]==1))
+    psb.occ2[i] <- length(which(ppl.long2[i,2]==1 && ppl.long2[i,6]==1))
+    anxbel.occ2[i] <- length(which( (ppl.long2[i,2]==1 && ppl.long2[i,3]>=1) ||                                                  (ppl.long2[i,2]==1 && ppl.long2[i,5]>=1)))
+    anxrsb.occ2[i] <- length(which( (ppl.long2[i,2]==1 && ppl.long2[i,3]>=2) ||                                                  (ppl.long2[i,2]==1 && ppl.long2[i,4]>=1)))
+  }
+  occurrences2[j:(j+tpoints2-1), 1] <- which(sequ2==j)
+  occurrences2[j:(j+tpoints2-1), 2] <- anx1.occ2[j:(j+tpoints2-1)]
+  occurrences2[j:(j+tpoints2-1), 3] <- anx2.occ2[j:(j+tpoints2-1)]
+  occurrences2[j:(j+tpoints2-1), 4] <- anx3.occ2[j:(j+tpoints2-1)]
+  occurrences2[j:(j+tpoints2-1), 5] <- bel1.occ2[j:(j+tpoints2-1)]
+  occurrences2[j:(j+tpoints2-1), 6] <- bel2.occ2[j:(j+tpoints2-1)]
+  occurrences2[j:(j+tpoints2-1), 7] <- bel3.occ2[j:(j+tpoints2-1)]
+  occurrences2[j:(j+tpoints2-1), 8] <- rsb.occ2[j:(j+tpoints2-1)]
+  occurrences2[j:(j+tpoints2-1), 9] <- psb.occ2[j:(j+tpoints2-1)]
+  occurrences2[j:(j+tpoints2-1), 10] <- anxbel.occ2[j:(j+tpoints2-1)]
+  occurrences2[j:(j+tpoints2-1), 11] <- anxrsb.occ2[j:(j+tpoints2-1)]
+}
+
+# create sequence for for loop
+sequj2 <- seq(from=30, to=tpoints2, by=30)
+
+# placeholders
+total2 <- rep(NA, length(sequj2))
+healthy2 <- rep(NA, length(sequj2))
+phobic2 <- rep(NA, length(sequj2))
+
+# until what time point should be measured:
+tpoints.smsp2 <- 360
+
+# only take the last seven days
+for(i in 1:nrow(ppl.wide2)){
+  anx1.occ2 <- occurrences2[occurrences2[,1]==i,2]
+  ppl.wide2$anx1.occ7[i] <- sum(anx1.occ2[(tpoints.smsp2-6):tpoints.smsp2])
+  anx2.occ2 <- occurrences2[occurrences2[,1]==i,3]
+  ppl.wide2$anx2.occ7[i] <- sum(anx2.occ2[(tpoints.smsp2-6):tpoints.smsp2])
+  anx3.occ2 <- occurrences2[occurrences2[,1]==i,4]
+  ppl.wide2$anx3.occ7[i] <- sum(anx3.occ2[(tpoints.smsp2-6):tpoints.smsp2])
+  bel1.occ2 <- occurrences2[occurrences2[,1]==i,5]
+  ppl.wide2$bel1.occ7[i] <- sum(bel1.occ2[(tpoints.smsp2-6):tpoints.smsp2])
+  bel2.occ2 <- occurrences2[occurrences2[,1]==i,6]
+  ppl.wide2$bel2.occ7[i] <- sum(bel2.occ2[(tpoints.smsp2-6):tpoints.smsp2])
+  bel3.occ2 <- occurrences2[occurrences2[,1]==i,7]
+  ppl.wide2$bel3.occ7[i] <- sum(bel3.occ2[(tpoints.smsp2-6):tpoints.smsp2])
+  rsb.occ2 <- occurrences2[occurrences2[,1]==i,8]
+  ppl.wide2$rsb.occ7[i] <- sum(rsb.occ2[(tpoints.smsp2-6):tpoints.smsp2])
+  psb.occ2 <- occurrences2[occurrences2[,1]==i,9]
+  ppl.wide2$psb.occ7[i] <- sum(psb.occ2[(tpoints.smsp2-6):tpoints.smsp2])
+  anxbel.occ2 <- occurrences2[occurrences2[,1]==i,10]
+  ppl.wide2$anxbel.occ7[i] <- sum(anxbel.occ2[(tpoints.smsp2-6):tpoints.smsp2])
+  anxrsb.occ2 <- occurrences2[occurrences2[,1]==i,11]
+  ppl.wide2$anxrsb.occ7[i] <- sum(anxrsb.occ2[(tpoints.smsp2-6):tpoints.smsp2])
+}
+
+# placeholders
+smsp2 <- matrix(NA, nrow=nrow(ppl.wide2), ncol=7)
+colnames(smsp2) <- c("i1", "i2", "i3", "i4", "i6", "i7", "i10")
+
+for (i in 1:nrow(ppl.wide2)) {
+  # item 1
+  smsp2[i,1] <- if (ppl.wide2$anx1.occ7[i] == 0) {0}
+               else if (ppl.wide2$anx1.occ7[i] <= 2) {1}
+               else if (ppl.wide2$anx1.occ7[i] <= 4) {2}
+               else if (ppl.wide2$anx1.occ7[i] <= 6) {3}
+               else {4}
+  # item 2
+  smsp2[i,2] <- if (ppl.wide2$anxbel.occ7[i] == 0) {0}
+               else if (ppl.wide2$anxbel.occ7[i] <= 2) {1}
+               else if (ppl.wide2$anxbel.occ7[i] <= 4) {2}
+               else if (ppl.wide2$anxbel.occ7[i] <= 6) {3}
+               else {4}
+  # item 3
+  smsp2[i,3] <- if (ppl.wide2$bel1.occ7[i] == 0) {0}
+               else if (ppl.wide2$bel1.occ7[i] <= 2) {1}
+               else if (ppl.wide2$bel1.occ7[i] <= 4) {2}
+               else if (ppl.wide2$bel1.occ7[i] <= 6) {3}
+               else {4}
+  # item 4
+  smsp2[i,4] <- if (ppl.wide2$anx2.occ7[i] == 0) {0}
+               else if (ppl.wide2$anx2.occ7[i] <= 2) {1}
+               else if (ppl.wide2$anx2.occ7[i] <= 4) {2}
+               else if (ppl.wide2$anx2.occ7[i] <= 6) {3}
+               else {4}
+  # item 6
+  smsp2[i,5] <- if (ppl.wide2$psb.occ7[i] == 0) {0}
+               else if (ppl.wide2$psb.occ7[i] <= 2) {1}
+               else if (ppl.wide2$psb.occ7[i] <= 4) {2}
+               else if (ppl.wide2$psb.occ7[i] <= 6) {3}
+               else {4}
+  # item 7
+  smsp2[i,6] <- if (ppl.wide2$rsb.occ7[i] == 0) {0}
+               else if (ppl.wide2$rsb.occ7[i] <= 2) {1}
+               else if (ppl.wide2$rsb.occ7[i] <= 4) {2}
+               else if (ppl.wide2$rsb.occ7[i] <= 6) {3}
+               else {4}
+  # item 10
+  smsp2[i,7] <- if (ppl.wide2$anxrsb.occ7[i] == 0) {0}
+               else if (ppl.wide2$anxrsb.occ7[i] <= 2) {1}
+               else if (ppl.wide2$anxrsb.occ7[i] <= 4) {2}
+               else if (ppl.wide2$anxrsb.occ7[i] <= 6) {3}
+               else {4}
+  ppl.wide2$total[i] <- rowSums(smsp2)[i]
+}
+```
+
+
+### Correlation Matrices
+
+Now, we can make and visualize correlation matrices of the emulated items for both models
+```{r}
+corr.smsp <- cor(smsp)
+corr.smsp2 <- cor(smsp2)
+
+par(mfrow=c(1,2))
+image(corr.smsp, xaxt="n", yaxt = "n", main="Model 1")
+image(corr.smsp2, xaxt = "n", yaxt = "n", main="Model 2")
+```
+
+
+### Principal Component Analysis (PCA)
+
+Run a PCA over the items for both models
+
+```{r}
+library(ltm)
+library(factoextra)
+library(multilevel)
+
+# Cronbach's alpha
+cronbach.alpha(smsp, CI=T) 
+cronbach.alpha(smsp2, CI=T) 
+
+# PCA
+pca <- prcomp(smsp, scale=T)
+print(pca2)
+
+# item-total correlations
+item.total(smsp)
+item.total(smsp2)
+```
+
+### Load CPES data
+
+The CPES data can be retrieved under https://www.icpsr.umich.edu/web/ICPSR/studies/20240# 
+Choose SPSS format for download.
+
+```{r Load CPES Data}
+library(foreign)
+# set the working directory to downloaded data and name the file "cpes.sav"
+dat <- read.spss("cpes.sav")
+
+# Data cleaning: binarise items
+i1_CPES <- dat$SP16
+i1_CPES <- as.character(i1_CPES)
+i1_CPES[i1_CPES != "NOT AT ALL"] <- 1      # Replace values
+i1_CPES[i1_CPES == "NOT AT ALL"] <- 0    
+i1_CPES <- as.numeric(i1_CPES)
+
+i2_CPES <- dat$SP18 
+i2_CPES <- as.character(i2_CPES)
+i2_CPES[i2_CPES == "YES"] <- 1             # Replace values
+i2_CPES[i2_CPES == "NO"] <- 0
+i2_CPES <- as.numeric(i2_CPES)
+
+i3_CPES <- dat$SP22 
+i3_CPES <- as.character(i3_CPES)
+i3_CPES[i3_CPES != "NEVER"] <- 1           # binarise
+i3_CPES[i3_CPES == "NEVER"] <- 0           # Replace values
+i3_CPES <- as.numeric(i3_CPES)  
+
+# bind them together
+isingCPES_NA <- cbind(i1_CPES, i2_CPES, i3_CPES)
+# only use complete cases
+isingCPES <- isingCPES_NA[complete.cases(isingCPES_NA),]
+```
+
+### Fit Ising Model to the two Models and to CPES Data
+
+```{r Ising Model}
+# First emulate measurement of the 3 CPES items with measurement functions
+# avoidance = RSB + PSB
+ppl.wide$avsum <- ppl.wide$rsbsum + ppl.wide$psbsum
+ppl.wide2$avsum2 <- ppl.wide2$rsbsum2 + ppl.wide2$psbsum2
+
+# measurement functions model 1
+for(i in 1:N){
+ppl.wide$i1[i] <- ifelse(ppl.wide[i, "fearsum"] >= 180 & ppl.wide[i, "avsum"] >= 100 ,1,0)
+ppl.wide$i2[i] <- ifelse(ppl.wide[i,"peakanx"] >= 8, 1, 0)
+ppl.wide$i3[i] <- ifelse(ppl.wide[i, "avsum"] >= 8, 1, 0)
+}
+# measurement functions model 2
+for(i in 1:N2){
+ppl.wide2$i1[i] <- ifelse(ppl.wide2[i, "fearsum2"] >= 180 & ppl.wide2[i, "avsum2"] >= 100 ,1,0)
+ppl.wide2$i2[i] <- ifelse(ppl.wide2[i, "peakanx2"] >= 8, 1, 0)
+ppl.wide2$i3[i] <- ifelse(ppl.wide2[i, "avsum2"] >= 8, 1, 0)
+}
+
+# fit ising models 
+res1 <- IsingFit(ising1, family='binomial', plot=T)
+res2 <- IsingFit(ising2, family='binomial', plot=T)
+resCPES <- IsingFit(isingCPES, family='binomial', plot=T)
+
+# make contingency tables 
+# model 1
+t12.1 <- table(ppl.wide[,"i1"],ppl.wide[,"i2"])/nrow(ppl.wide)*100
+t13.1 <- table(ppl.wide[,"i1"],ppl.wide[,"i3"])/nrow(ppl.wide)*100
+t23.1 <- table(ppl.wide[,"i2"],ppl.wide[,"i3"])/nrow(ppl.wide)*100
+# model 2
+t12.2 <- table(ppl.wide2[,"i1"],ppl.wide2[,"i2"])/nrow(ppl.wide2)*100
+t13.2 <- table(ppl.wide2[,"i1"],ppl.wide2[,"i3"])/nrow(ppl.wide2)*100
+t23.2 <- table(ppl.wide2[,"i2"],ppl.wide2[,"i3"])/nrow(ppl.wide2)*100
+# CPES data
+t12.cpes <- table(isingCPES[,"i1_CPES"], isingCPES[,"i2_CPES"])/nrow(isingCPES)*100
+t13.cpes <- table(isingCPES[,"i1_CPES"], isingCPES[,"i3_CPES"])/nrow(isingCPES)*100
+t23.cpes <- table(isingCPES[,"i2_CPES"], isingCPES[,"i3_CPES"])/nrow(isingCPES)*100
+
+# chi square tests
+chisq.test(t12.1)
+chisq.test(t12.2)
+chisq.test(t12.cpes)
+
+chisq.test(t13.1)
+chisq.test(t13.2)
+chisq.test(t13.cpes)
+
+chisq.test(t23.1)
+chisq.test(t23.2)
+chisq.test(t23.cpes)
+
+library(effectsize)
+# get phi coefficient for every item pair and every data source
+phi(t12.1)
+phi(t12.2)
+phi(t12.cpes)
+
+phi(t13.1)
+phi(t13.2)
+phi(t13.cpes)
+
+phi(t23.1)
+phi(t23.2)
+phi(t23.cpes)
+
+# plot parameters of ising models 
+layout(t(1:3))
+qgraph(res1$weiadj,fade = FALSE, edge.labels=T, edge.label.cex=2)
+title("Model 1")
+qgraph(res2$weiadj,fade = FALSE, edge.labels=T, edge.label.cex=2)
+title("Model 2")
+qgraph(resCPES$weiadj,fade = FALSE, edge.labels=T, edge.label.cex=2)
+title("Observed network")
+```
+
+
+
